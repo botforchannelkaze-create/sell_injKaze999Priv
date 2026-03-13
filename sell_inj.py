@@ -46,6 +46,7 @@ def save_db():
 # Helpers
 # ======================
 def generate_key():
+    # Nananatiling "Kaze" ang prefix para mag-match sa VIP watermark mo
     return "Kaze" + ''.join(random.choices(string.ascii_letters + string.digits, k=12))
 
 def notify_telegram(message):
@@ -89,7 +90,7 @@ def genkey_cmd(update: Update, context: CallbackContext):
     duration = context.args[0]
 
     if duration not in KEY_DURATIONS:
-        update.message.reply_text("Invalid duration")
+        update.message.reply_text("Invalid duration. Choose: 1d, 3d, 7d, 30d, 60d, lifetime")
         return
 
     key = generate_key()
@@ -131,7 +132,6 @@ def revoke_cmd(update: Update, context: CallbackContext):
     save_db()
 
     update.message.reply_text(f"⛔ Key revoked:\n{key}")
-
     notify_telegram(f"⛔ Key revoked\nKey: {key}")
 
 def list_cmd(update: Update, context: CallbackContext):
@@ -139,30 +139,37 @@ def list_cmd(update: Update, context: CallbackContext):
         update.message.reply_text("No keys in database")
         return
 
-    text = "📋 Keys:\n\n"
-
+    text = "📋 Keys List:\n\n"
     for k,v in db["keys"].items():
         status = "Expired" if v["expired"] else "Active"
-        text += f"{k} | {v['duration']} | {status}\n"
+        dev = v["device"] if v["device"] else "No Device"
+        text += f"🔑 {k} | {v['duration']} | {status}\n📱 {dev}\n---\n"
 
-    update.message.reply_text(text)
+    # Split text if too long for Telegram
+    if len(text) > 4096:
+        update.message.reply_text(text[:4096])
+    else:
+        update.message.reply_text(text)
 
 # ======================
 # TELEGRAM BOT THREAD
 # ======================
 
 def run_bot():
-    updater = Updater(BOT_TOKEN, use_context=True)
-    dp = updater.dispatcher
+    try:
+        updater = Updater(BOT_TOKEN, use_context=True)
+        dp = updater.dispatcher
 
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("genkey", genkey_cmd))
-    dp.add_handler(CommandHandler("revoke", revoke_cmd))
-    dp.add_handler(CommandHandler("list", list_cmd))
+        dp.add_handler(CommandHandler("start", start))
+        dp.add_handler(CommandHandler("genkey", genkey_cmd))
+        dp.add_handler(CommandHandler("revoke", revoke_cmd))
+        dp.add_handler(CommandHandler("list", list_cmd))
 
-    print("Telegram bot started...")
-    updater.start_polling()
-    updater.idle()
+        print("Telegram bot started...")
+        updater.start_polling()
+        # Inalis ang updater.idle() para hindi mag-error sa Threading/Render
+    except Exception as e:
+        print(f"Bot Error: {e}")
 
 # ======================
 # API ROUTES
@@ -174,7 +181,6 @@ def home():
 
 @app.route("/verify")
 def verify():
-
     key = request.args.get("key")
     device = request.args.get("device")
 
@@ -211,15 +217,11 @@ def verify():
 @app.route("/revoke")
 def revoke_api():
     key = request.args.get("key")
-
     if key not in db["keys"]:
         return jsonify({"status":"error","message":"Key not found"})
 
     db["keys"][key]["expired"] = True
     save_db()
-
-    notify_telegram(f"⛔ Key revoked via API\nKey: {key}")
-
     return jsonify({"status":"success"})
 
 @app.route("/list")
@@ -227,13 +229,15 @@ def list_api():
     return jsonify(db["keys"])
 
 # ======================
-# RUN
+# RUN SERVER
 # ======================
 
 if __name__ == "__main__":
+    # Start telegram bot in background thread
+    # Daemon=True para mamatay ang thread kasabay ng main process
+    t = threading.Thread(target=run_bot, daemon=True)
+    t.start()
 
-    # Start telegram bot in background
-    threading.Thread(target=run_bot).start()
-
+    # Start Flask server
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
