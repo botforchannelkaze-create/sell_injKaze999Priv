@@ -1,3 +1,6 @@
+import os
+import asyncio
+from flask import Flask
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
 import requests, os, time
