@@ -33,7 +33,7 @@ def genkey(update: Update, context: CallbackContext):
 
     # Request key from panel
     try:
-        resp = requests.get(f"{PANEL_URL}/vipgen?duration={duration}", timeout=5)
+        resp = requests.get(f"{PANEL_URL}/vipgen?duration={duration}", timeout=30)
         if resp.status_code == 200:
             key = resp.text.strip()
             update.message.reply_text(f"✅ VIP Key: `{key}`\nDuration: {duration}", parse_mode="Markdown")
