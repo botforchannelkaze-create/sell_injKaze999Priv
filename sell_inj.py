@@ -3,203 +3,237 @@ from flask_cors import CORS
 import uuid, time, json, os, random, string, threading
 import requests
 
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, CallbackContext
+
 app = Flask(__name__)
 CORS(app)
+
+# ======================
+# ENV VARIABLES
+# ======================
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+CHAT_ID = os.environ.get("CHAT_ID")
 
 # ======================
 # Constants
 # ======================
 DATA_FILE = "database.json"
+
 KEY_DURATIONS = {
     "1d": 86400,
     "3d": 259200,
     "7d": 604800,
     "30d": 2592000,
     "60d": 5184000,
-    "lifetime": 315360000  # 10 years
+    "lifetime": None
 }
-TOKEN_EXPIRY = 60
-KEY_LIMIT = 600  # prevent key spam per IP
-COOLDOWN = 10
-
-# Telegram
-BOT_TOKEN = "8666247437:AAFIqrWLLbH-0z8W4CnX6nRHjojKX_B6YG8"
-CHAT_ID = "7201369115"
 
 # ======================
-# Load DB
+# Load database
 # ======================
 if os.path.exists(DATA_FILE):
     with open(DATA_FILE, "r") as f:
         db = json.load(f)
 else:
-    db = {
-        "keys": {},
-        "tokens": {},
-        "ip_limit": {},
-        "cooldowns": {}
-    }
+    db = {"keys": {}}
 
 def save_db():
     with open(DATA_FILE, "w") as f:
         json.dump(db, f, indent=2)
 
 # ======================
-# Helper Functions
+# Helpers
 # ======================
-def cleanup():
-    now = time.time()
-    # Remove expired tokens
-    for t in list(db["tokens"].keys()):
-        if now - db["tokens"][t]["time"] > TOKEN_EXPIRY:
-            del db["tokens"][t]
-    # Remove expired keys
-    for k, v in list(db["keys"].items()):
-        if v["expiry"] and now > v["expiry"]:
-            db["keys"][k]["expired"] = True
-    # Remove IP limits
-    for ip in list(db["ip_limit"].keys()):
-        if now - db["ip_limit"][ip] > KEY_LIMIT:
-            del db["ip_limit"][ip]
-
 def generate_key():
     return "Kaze" + ''.join(random.choices(string.ascii_letters + string.digits, k=12))
 
 def notify_telegram(message):
-    def _send():
-        try:
-            requests.get(
-                f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-                params={"chat_id": CHAT_ID, "text": message, "parse_mode":"Markdown"},
-                timeout=5
-            )
-        except:
-            pass
-    threading.Thread(target=_send).start()
+    if not BOT_TOKEN or not CHAT_ID:
+        return
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+            data={
+                "chat_id": CHAT_ID,
+                "text": message
+            },
+            timeout=5
+        )
+    except:
+        pass
 
 # ======================
-# Routes
+# TELEGRAM COMMANDS
 # ======================
-@app.route("/")
-def home():
-    return "SELL INJECTOR SERVER ONLINE 🚀"
 
-# ======= Generate key via token =======
-@app.route("/genkey")
-def genkey():
-    cleanup()
-    token = request.args.get("token")
-    duration = request.args.get("duration", "1d")
-    ip = request.remote_addr
-    now = time.time()
+def start(update: Update, context: CallbackContext):
+    update.message.reply_text(
+        "🚀 Kaze Injector Key Bot\n\n"
+        "Commands:\n"
+        "/genkey 1d\n"
+        "/genkey 3d\n"
+        "/genkey 7d\n"
+        "/genkey 30d\n"
+        "/genkey 60d\n"
+        "/genkey lifetime\n"
+        "/revoke KEY\n"
+        "/list"
+    )
 
-    if not token or token not in db["tokens"]:
-        return jsonify({"status":"error","message":"Invalid token"}),403
+def genkey_cmd(update: Update, context: CallbackContext):
+    if not context.args:
+        update.message.reply_text("Usage: /genkey 1d")
+        return
 
-    data = db["tokens"][token]
-    if data["ip"] != ip:
-        return jsonify({"status":"error","message":"IP mismatch"}),403
-
-    if now - data["time"] > TOKEN_EXPIRY:
-        del db["tokens"][token]
-        save_db()
-        return jsonify({"status":"error","message":"Token expired"}),403
-
-    # cooldown per IP
-    if ip in db["ip_limit"]:
-        return jsonify({"status":"error","message":"Wait before generating another key"}),403
+    duration = context.args[0]
 
     if duration not in KEY_DURATIONS:
-        return jsonify({"status":"error","message":"Invalid duration"}),400
+        update.message.reply_text("Invalid duration")
+        return
 
     key = generate_key()
+
+    expiry = None
+    if KEY_DURATIONS[duration]:
+        expiry = int(time.time()) + KEY_DURATIONS[duration]
+
     db["keys"][key] = {
         "device": None,
-        "expiry": now + KEY_DURATIONS[duration] if duration != "lifetime" else None,
+        "expiry": expiry,
         "duration": duration,
         "expired": False
     }
 
-    db["ip_limit"][ip] = now
-    del db["tokens"][token]
     save_db()
 
-    notify_telegram(f"🆕 New key generated!\nKey: {key}\nDuration: {duration}")
+    update.message.reply_text(
+        f"✅ Key Generated\n\n"
+        f"Key: `{key}`\n"
+        f"Duration: {duration}",
+        parse_mode="Markdown"
+    )
 
-    return jsonify({"status":"success","key": key, "duration": duration})
+    notify_telegram(f"🆕 New Key Generated\nKey: {key}\nDuration: {duration}")
 
-# ======= Verify key =======
+def revoke_cmd(update: Update, context: CallbackContext):
+    if not context.args:
+        update.message.reply_text("Usage: /revoke KEY")
+        return
+
+    key = context.args[0]
+
+    if key not in db["keys"]:
+        update.message.reply_text("Key not found")
+        return
+
+    db["keys"][key]["expired"] = True
+    save_db()
+
+    update.message.reply_text(f"⛔ Key revoked:\n{key}")
+
+    notify_telegram(f"⛔ Key revoked\nKey: {key}")
+
+def list_cmd(update: Update, context: CallbackContext):
+    if not db["keys"]:
+        update.message.reply_text("No keys in database")
+        return
+
+    text = "📋 Keys:\n\n"
+
+    for k,v in db["keys"].items():
+        status = "Expired" if v["expired"] else "Active"
+        text += f"{k} | {v['duration']} | {status}\n"
+
+    update.message.reply_text(text)
+
+# ======================
+# TELEGRAM BOT THREAD
+# ======================
+
+def run_bot():
+    updater = Updater(BOT_TOKEN, use_context=True)
+    dp = updater.dispatcher
+
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("genkey", genkey_cmd))
+    dp.add_handler(CommandHandler("revoke", revoke_cmd))
+    dp.add_handler(CommandHandler("list", list_cmd))
+
+    print("Telegram bot started...")
+    updater.start_polling()
+    updater.idle()
+
+# ======================
+# API ROUTES
+# ======================
+
+@app.route("/")
+def home():
+    return "Kaze Injector Server Online 🚀"
+
 @app.route("/verify")
 def verify():
-    cleanup()
+
     key = request.args.get("key")
     device = request.args.get("device")
-    now = time.time()
 
     if not key or key not in db["keys"]:
         return "invalid"
 
     data = db["keys"][key]
+    now = int(time.time())
 
-    # Check expiration
-    if data.get("expired"):
+    if data["expired"]:
         return "expired"
+
     if data["expiry"] and now > data["expiry"]:
         data["expired"] = True
         save_db()
         return "expired"
 
-    # Bind device
+    # device binding
     if data["device"] is None:
         data["device"] = device
         save_db()
-        remaining = int(data["expiry"] - now) if data["expiry"] else None
-        notify_telegram(f"🔐 Key used\nKey: {key}\nDevice: {device}\nRemaining: {remaining}s")
-        return "valid"
 
-    if data["device"] == device:
-        remaining = int(data["expiry"] - now) if data["expiry"] else None
-        notify_telegram(f"🔐 Key used\nKey: {key}\nDevice: {device}\nRemaining: {remaining}s")
-        return "valid"
+    if data["device"] != device:
+        return "locked"
 
-    return "locked"
+    notify_telegram(
+        f"🔐 Key Login\n"
+        f"Key: {key}\n"
+        f"Device: {device}"
+    )
 
-# ======= Token generation for API =======
-@app.route("/token")
-def token():
-    cleanup()
-    ip = request.remote_addr
-    now = time.time()
+    return "valid"
 
-    if ip in db["cooldowns"] and now - db["cooldowns"][ip] < COOLDOWN:
-        wait = int(COOLDOWN - (now - db["cooldowns"][ip]))
-        return f"Cooldown active wait {wait}s",429
-
-    token_id = str(uuid.uuid4())
-    db["tokens"][token_id] = {"ip": ip, "time": now}
-    db["cooldowns"][ip] = now
-    save_db()
-    return token_id
-
-# ======= Admin: Revoke key =======
 @app.route("/revoke")
-def revoke():
+def revoke_api():
     key = request.args.get("key")
-    if not key or key not in db["keys"]:
-        return jsonify({"status":"error","message":"Key not found"}),404
+
+    if key not in db["keys"]:
+        return jsonify({"status":"error","message":"Key not found"})
+
     db["keys"][key]["expired"] = True
     save_db()
-    notify_telegram(f"⛔ Key revoked: {key}")
-    return jsonify({"status":"success","message":"Key revoked"})
 
-# ======= List keys =======
+    notify_telegram(f"⛔ Key revoked via API\nKey: {key}")
+
+    return jsonify({"status":"success"})
+
 @app.route("/list")
-def list_keys():
+def list_api():
     return jsonify(db["keys"])
 
 # ======================
 # RUN
 # ======================
+
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT",10000))
+
+    # Start telegram bot in background
+    threading.Thread(target=run_bot).start()
+
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
