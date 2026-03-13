@@ -2,6 +2,18 @@ from telegram import Update
 from telegram.ext import Updater, CommandHandler, CallbackContext
 import requests, os, time
 
+# ===== WEBKEEP ALIVE =====
+app_web = Flask(__name__)
+OWNER_ID = int(os.getenv("OWNER_ID", "0"))
+
+@app_web.route("/")
+def home():
+    return "Bot is online!"
+
+def keep_alive():
+    port = int(os.environ.get("PORT", 10000))
+    Thread(target=lambda: app_web.run(host="0.0.0.0", port=port)).start()
+
 BOT_TOKEN = os.environ.get("BOT_TOKEN")  # Set your bot token
 PANEL_URL = "https://codm-injector-panel.onrender.com"
 
@@ -34,4 +46,5 @@ def main():
     updater.idle()
 
 if __name__ == "__main__":
+    keep_alive()
     main()
