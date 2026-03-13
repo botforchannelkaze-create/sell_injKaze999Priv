@@ -1,4 +1,4 @@
 flask
 flask-cors
 requests
-python-telegram-bot>=20.0
+python-telegram-bot==13.15
