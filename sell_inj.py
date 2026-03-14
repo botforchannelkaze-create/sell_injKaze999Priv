@@ -5,16 +5,10 @@ from threading import Thread
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
 
-# ======================
-# CONFIG
-# ======================
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 OWNER_ID = int(os.environ.get("OWNER_ID"))
 PANEL_URL = "https://codm-injector-panel.onrender.com"
 
-# ======================
-# KEEP ALIVE SERVER
-# ======================
 app = Flask(__name__)
 
 @app.route("/")
@@ -22,18 +16,16 @@ def home():
     return "Bot running!"
 
 def keep_alive():
-    port = int(os.environ.get("PORT", 10000))
-    Thread(target=lambda: app.run(host="0.0.0.0", port=port)).start()
+    port = int(os.environ.get("PORT",10000))
+    Thread(target=lambda: app.run(host="0.0.0.0",port=port)).start()
 
-# ======================
-# OWNER CHECK
-# ======================
 def is_owner(update: Update):
     return update.effective_user.id == OWNER_ID
 
 # ======================
-# START COMMAND
+# START
 # ======================
+
 def start(update: Update, context: CallbackContext):
 
     if not is_owner(update):
@@ -43,143 +35,94 @@ def start(update: Update, context: CallbackContext):
 
     name = update.effective_user.first_name
 
-    text = f"""
+    text=f"""
 👋 HELLO, {name}!
 
 🔰 KAZE CODM INJECTOR
 OFFICIAL VIP ACCESS PANEL
 
-Welcome back to the official
-Kaze Injector key generation system.
-
-From this panel you can generate
-your exclusive VIP License Key
-to activate the injector and unlock
-all premium features.
-
-⚡ Instant Key Generation
-🔐 Secure License System
-🚀 Fast & Smooth Activation
-🛡 Protected Access
-
-Owner: @KAZEHAYAMODZ
-
-Please choose an option below to continue.
+Please choose an option below.
 """
 
-    keyboard = [
-        [InlineKeyboardButton("🔑 Generate VIP Key", callback_data="vip")],
-        [InlineKeyboardButton("⏱ Generate Hours Key", callback_data="hours")],
-        [InlineKeyboardButton("📊 Panel Stats", callback_data="stats")]
+    keyboard=[
+        [InlineKeyboardButton("🔑 Generate VIP Key",callback_data="vip")],
+        [InlineKeyboardButton("⏱ Generate Hours Key",callback_data="hours")],
+        [InlineKeyboardButton("📊 Panel Stats",callback_data="stats")]
     ]
 
-    update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+    update.message.reply_text(text,reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ======================
-# BUTTON HANDLER
+# BUTTONS
 # ======================
+
 def button(update: Update, context: CallbackContext):
 
-    query = update.callback_query
+    query=update.callback_query
     query.answer()
 
-    if query.from_user.id != OWNER_ID:
+    if query.from_user.id!=OWNER_ID:
         query.edit_message_text("🚫 Access denied")
         return
 
-    data = query.data
+    data=query.data
 
-# ======================
-# VIP MENU
-# ======================
+    if data=="vip":
 
-    if data == "vip":
-
-        keyboard = [
-            [InlineKeyboardButton("1 Day", callback_data="gen_1d")],
-            [InlineKeyboardButton("3 Days", callback_data="gen_3d")],
-            [InlineKeyboardButton("7 Days", callback_data="gen_7d")],
-            [InlineKeyboardButton("30 Days", callback_data="gen_30d")],
-            [InlineKeyboardButton("60 Days", callback_data="gen_60d")],
-            [InlineKeyboardButton("Lifetime", callback_data="gen_lifetime")]
+        keyboard=[
+            [InlineKeyboardButton("1 Day",callback_data="gen_1d")],
+            [InlineKeyboardButton("3 Days",callback_data="gen_3d")],
+            [InlineKeyboardButton("7 Days",callback_data="gen_7d")],
+            [InlineKeyboardButton("30 Days",callback_data="gen_30d")]
         ]
 
         query.edit_message_text(
-            "🔑 Select VIP Key Duration",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        "🔑 Select VIP Key Duration",
+        reply_markup=InlineKeyboardMarkup(keyboard))
 
-# ======================
-# HOURS MENU
-# ======================
+    elif data=="hours":
 
-    elif data == "hours":
+        keyboard=[]
 
-        keyboard = []
-
-        for i in range(1, 11):
+        for i in range(1,25):
             keyboard.append(
-                [InlineKeyboardButton(f"{i} Minute", callback_data=f"gen_{i}m")]
-            )
-
-        for i in range(1, 25):
-            keyboard.append(
-                [InlineKeyboardButton(f"{i} Hour", callback_data=f"gen_{i}h")]
+            [InlineKeyboardButton(f"{i} Hour",callback_data=f"gen_{i}h")]
             )
 
         query.edit_message_text(
-            "⏱ Select Duration",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        "⏱ Select Duration",
+        reply_markup=InlineKeyboardMarkup(keyboard))
 
-# ======================
-# PANEL STATS
-# ======================
+    elif data=="stats":
 
-    elif data == "stats":
+        r=requests.get(f"{PANEL_URL}/stats")
+        data=r.json()
 
-        try:
-
-            r = requests.get(f"{PANEL_URL}/stats", timeout=15)
-            data = r.json()
-
-            msg = f"""
-📊 PANEL STATISTICS
+        msg=f"""
+📊 PANEL STATS
 
 Total Keys: {data['total_keys']}
 Active Keys: {data['active_keys']}
 Expired Keys: {data['expired_keys']}
 """
 
-            query.edit_message_text(msg)
-
-        except:
-            query.edit_message_text("❌ Failed to get stats")
-
-# ======================
-# GENERATE KEY
-# ======================
+        query.edit_message_text(msg)
 
     elif data.startswith("gen_"):
 
-        duration = data.replace("gen_", "")
+        duration=data.replace("gen_","")
 
-        try:
+        token=requests.get(f"{PANEL_URL}/token").text.strip()
 
-            # get token
-            token = requests.get(f"{PANEL_URL}/token", timeout=15).text.strip()
+        r=requests.get(f"{PANEL_URL}/getkey?token={token}")
 
-            # generate key
-            r = requests.get(f"{PANEL_URL}/getkey?token={token}", timeout=15)
+        if r.status_code!=200:
+            query.edit_message_text(f"❌ Server Error\n{r.text}")
+            return
 
-            if r.status_code != 200:
-                query.edit_message_text("❌ Key generation failed")
-                return
+        key=r.json()["key"]
 
-            key_data = r.json()
-            key = key_data.get("key", "ERROR")
-
-            msg = f"""
+        msg=f"""
 🔑 𝗞𝗘𝗬 𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗘𝗗
 ━━━━━━━━━━━━━━━━━━━━
 🔑 KEY: `{key}`
@@ -195,14 +138,10 @@ Duration will start when license login.
 🫶 THANK YOU FOR TRUSTING
 """
 
-            query.edit_message_text(msg, parse_mode="Markdown")
-
-        except Exception as e:
-
-            query.edit_message_text(f"❌ Error: {e}")
+        query.edit_message_text(msg,parse_mode="Markdown")
 
 # ======================
-# REVOKE COMMAND
+# REVOKE
 # ======================
 
 def revoke(update: Update, context: CallbackContext):
@@ -214,30 +153,17 @@ def revoke(update: Update, context: CallbackContext):
         update.message.reply_text("Usage:\n/revoke KEY")
         return
 
-    key = context.args[0]
+    key=context.args[0]
 
-    try:
+    r=requests.get(f"{PANEL_URL}/revoke?key={key}")
 
-        r = requests.get(f"{PANEL_URL}/revoke?key={key}", timeout=15)
-
-        if r.status_code == 200:
-
-            update.message.reply_text(f"""
-🚫 KEY REVOKED
-
-KEY: `{key}`
-STATUS: DISABLED
-""", parse_mode="Markdown")
-
-        else:
-            update.message.reply_text("❌ Failed to revoke key")
-
-    except Exception as e:
-
-        update.message.reply_text(f"❌ Error: {e}")
+    if r.status_code==200:
+        update.message.reply_text(f"🚫 KEY REVOKED\n\n`{key}`",parse_mode="Markdown")
+    else:
+        update.message.reply_text("❌ Failed to revoke key")
 
 # ======================
-# LIST KEYS
+# LIST
 # ======================
 
 def listkeys(update: Update, context: CallbackContext):
@@ -245,53 +171,20 @@ def listkeys(update: Update, context: CallbackContext):
     if not is_owner(update):
         return
 
-    try:
+    r=requests.get(f"{PANEL_URL}/list")
 
-        r = requests.get(f"{PANEL_URL}/list", timeout=15)
-        data = r.json()
+    data=r.json()
 
-        if not data:
-            update.message.reply_text("No active keys.")
-            return
-
-        msg = "🔑 ACTIVE KEYS\n\n"
-
-        for k in data[:20]:
-            msg += f"{k['key']} | Device:{k['device']}\n"
-
-        update.message.reply_text(msg)
-
-    except:
-
-        update.message.reply_text("❌ Failed to fetch keys")
-
-# ======================
-# STATS COMMAND
-# ======================
-
-def stats(update: Update, context: CallbackContext):
-
-    if not is_owner(update):
+    if not data:
+        update.message.reply_text("No active keys")
         return
 
-    try:
+    msg="🔑 ACTIVE KEYS\n\n"
 
-        r = requests.get(f"{PANEL_URL}/stats", timeout=15)
-        data = r.json()
+    for k in data[:20]:
+        msg+=f"{k['key']} | {k['remaining']}\n"
 
-        msg = f"""
-📊 PANEL STATS
-
-Total Keys: {data['total_keys']}
-Active Keys: {data['active_keys']}
-Expired Keys: {data['expired_keys']}
-"""
-
-        update.message.reply_text(msg)
-
-    except:
-
-        update.message.reply_text("❌ Failed to get stats")
+    update.message.reply_text(msg)
 
 # ======================
 # MAIN
@@ -299,22 +192,18 @@ Expired Keys: {data['expired_keys']}
 
 def main():
 
-    updater = Updater(BOT_TOKEN, use_context=True)
-    dp = updater.dispatcher
+    updater=Updater(BOT_TOKEN,use_context=True)
 
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("revoke", revoke))
-    dp.add_handler(CommandHandler("list", listkeys))
-    dp.add_handler(CommandHandler("stats", stats))
+    dp=updater.dispatcher
+
+    dp.add_handler(CommandHandler("start",start))
+    dp.add_handler(CommandHandler("revoke",revoke))
+    dp.add_handler(CommandHandler("list",listkeys))
     dp.add_handler(CallbackQueryHandler(button))
 
     updater.start_polling()
     updater.idle()
 
-# ======================
-# RUN
-# ======================
-
-if __name__ == "__main__":
+if __name__=="__main__":
     keep_alive()
     main()
