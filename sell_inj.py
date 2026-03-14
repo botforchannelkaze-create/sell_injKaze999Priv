@@ -50,13 +50,13 @@ def start(update: Update, context: CallbackContext):
     text = f"""
 👋 HELLO {name}
 
-WELCOME BACK TO
+WELCOME BACK BOSS
 
-🔰 KAZE CODM INJECTOR PANEL 🔰
+KAZE CODM INJECTOR PRIVATE PANEL  
 
-Here you can generate VIP license keys for the injector.
+Here you can generate VIP license keys for the codm injector.
 
-Choose an option below.
+Choose an option below👇
 """
 
     keyboard = [
@@ -159,8 +159,8 @@ Expired Keys: {data['expired_keys']}
 📝 Tap to copy your key
 Duration will start when license login.
 
-📲 Feedback: @KAZEHAYAMODZ
-🫶 THANK YOU FOR TRUSTING
+📲𝙁𝙚𝙚𝙙𝙗𝙖𝙘𝙠: @KAZEHAYAMODZ
+🫶𝑻𝑯𝑨𝑵𝑲 𝒀𝑶𝑼 𝑭𝑶𝑹 𝑻𝑹𝑼𝑺𝑻𝑰𝑵𝑮
 """
 
             query.edit_message_text(msg, parse_mode="Markdown")
