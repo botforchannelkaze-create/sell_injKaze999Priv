@@ -37,35 +37,51 @@ def is_owner(update: Update):
 # ======================
 # START COMMAND
 # ======================
-
 def start(update: Update, context: CallbackContext):
-
+    # Owner check
     if not is_owner(update):
         update.message.reply_text(
-        "🚫 This is private key generator panel only\n\nOwner: @KAZEHAYAMODZ")
+            "🚫 Access Denied\n\n"
+            "This is a private key generator panel.\n\n"
+            "Owner: @KAZEHAYAMODZ"
+        )
         return
 
     name = update.effective_user.first_name
 
     text = f"""
-👋 HELLO {name}
+👋 HELLO, {name}!
 
-WELCOME BACK BOSS
+🔰 KAZE CODM INJECTOR
+OFFICIAL VIP ACCESS PANEL
 
-KAZE CODM INJECTOR PRIVATE PANEL  
+Welcome back to the official
+Kaze Injector key generation system.
 
-Here you can generate VIP license keys for the codm injector.
+From this panel you can generate
+your exclusive VIP License Key
+to activate the injector and unlock
+all premium features.
 
-Choose an option below👇
+⚡ Instant Key Generation
+🔐 Secure License System
+🚀 Fast & Smooth Activation
+🛡 Protected Access
+
+Owner: @KAZEHAYAMODZ
+
+Please choose an option below to continue.
 """
 
     keyboard = [
-        [InlineKeyboardButton("🔑 Generate VIP Key",callback_data="vip")],
-        [InlineKeyboardButton("⏱ Generate Hours Key",callback_data="hours")],
-        [InlineKeyboardButton("📊 Panel Stats",callback_data="stats")]
+        [InlineKeyboardButton("🔑 Generate VIP Key", callback_data="vip")],
+        [InlineKeyboardButton("⏱ Generate Hours Key", callback_data="hours")],
+        [InlineKeyboardButton("📊 Panel Stats", callback_data="stats")]
     ]
 
-    update.message.reply_text(text,reply_markup=InlineKeyboardMarkup(keyboard))
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    update.message.reply_text(text, reply_markup=reply_markup)
 
 # ======================
 # BUTTON HANDLER
@@ -97,7 +113,7 @@ def button(update: Update, context: CallbackContext):
             "🔑 Select VIP Key Duration",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
-
+        
 # HOURS MENU
 
     elif data == "hours":
