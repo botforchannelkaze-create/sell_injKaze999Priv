@@ -155,7 +155,7 @@ Expired Keys: {data['expired_keys']}
             token = requests.get(f"{PANEL_URL}/token", timeout=15).text.strip()
 
             # Step 2: get key
-            r = requests.get(f"{PANEL_URL}/getkey?token={token}&src=bot", timeout=15)
+            r = requests.get(f"{PANEL_URL}/getkey?token={token}&src=bot&duration={duration}", timeout=15)
             if r.status_code != 200:
                 query.edit_message_text("❌ Key generation failed")
                 return
